@@ -399,7 +399,7 @@ mod:hook_require("scripts/settings/damage/damage_profiles/minion_damage_profile_
 			default_target = {
 				power_distribution_ranged = {
 					attack = {
-						far = 40, -- 125
+						far = 50, -- 25
 						near = 125,
 					}
 				}
@@ -849,6 +849,14 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bt_in_cover_a
 	end)
 end)
 
+-- MUTANT: GRAB
+local BreedActions = require("scripts/settings/breed/breed_actions")
+BreedActions.cultist_mutant.charge.grab_anim_duration = {
+    cryptic = 0.75, -- 1.5
+    human = 0.75,  -- 1.5
+    ogryn = 0.75, -- 0.8333333333
+}
+
 -- MUTANT: Keep smashing the grabbed player until downed/death
 local BtMutantChargerChargeAction = require("scripts/extension_systems/behavior/nodes/actions/bt_mutant_charger_charge_action")
 local ENDLESS_SMASH_BREEDS = {
@@ -1162,13 +1170,6 @@ BreedActions.renegade_grenadier.quick_throw_grenade.cooldown = MinionDifficultyS
 
 -- SNIPERS: MOVE FASTER WITHOUT LOS
 BreedActions.renegade_sniper.shoot.lost_los_fail_duration = 15
-
--- MUTIE: GRAB
-BreedActions.cultist_mutant.grab_anim_duration = {
-    cryptic = 1.1, -- 1.5
-    human = 1.1,  -- 1.5
-    ogryn = 0.65, -- 0.8333333333
-}
 
 -- RENEGADE FLAMER MUTATOR: Add the explosive backpack
 local HitZone = require("scripts/utilities/attack/hit_zone")

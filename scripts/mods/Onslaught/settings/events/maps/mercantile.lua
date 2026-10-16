@@ -164,7 +164,7 @@ local template = {
             {
                 "spawn_by_breed_name",
                 breed_name = "chaos_ogryn_executor",
-                breed_amount = 3,
+                breed_amount = 2,
                 delay_until_all_spawned = false,
                 spawner_group = "spawner_gauntlet_armoury_stoppers"
             },
@@ -212,7 +212,7 @@ local template = {
             {
                 "spawn_by_breed_name",
                 breed_name = "chaos_ogryn_bulwark",
-                breed_amount = 3,
+                breed_amount = 2,
                 delay_until_all_spawned = false,
                 spawner_group = "spawner_gauntlet_armoury_stoppers"
             },
@@ -294,14 +294,14 @@ local template = {
             {
                 "spawn_by_breed_name",
                 breed_name = "cultist_grenadier",
-                breed_amount = 3,
+                breed_amount = 1,
                 delay_until_all_spawned = false,
                 spawner_group = "spawner_gauntlet_armoury_stoppers"
             },
             {
                 "spawn_by_breed_name",
                 breed_name = "cultist_mutant",
-                breed_amount = 5,
+                breed_amount = 3,
                 delay_until_all_spawned = false,
                 spawner_group = "spawner_gauntlet_armoury_stoppers",
             },

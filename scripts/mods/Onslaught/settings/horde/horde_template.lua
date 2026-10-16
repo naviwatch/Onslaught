@@ -355,11 +355,11 @@ mod:hook_require("scripts/managers/pacing/horde_pacing/horde_pacing_templates", 
 		end
 
 		for _, level in pairs(template_data.resistance_templates) do
-			level.horde_timer_range = { 125, 150 }
+			level.horde_timer_range = { 130, 160 }
 			level.max_active_minions = MAX_ACTIVE_MINIONS
 			level.max_active_minions_for_ambush = MAX_ACTIVE_MINIONS
 			level.num_waves = {
-				ambush_horde = 3,
+				ambush_horde = 2,
 				far_vector_horde = 3, -- 3
 			}
 			level.time_between_waves = 25

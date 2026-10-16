@@ -145,10 +145,10 @@ local onslaught_settings = {
 				3,
 			},
 			{
-				10,
-				10,
-				10,
-				10,
+				4,
+				4,
+				5,
+				7,
 			},
 		},
 		default_disabler_override_duration = {
@@ -156,7 +156,7 @@ local onslaught_settings = {
 			240,
 			160,
 			100,
-			40, -- 80
+			60, -- 80
 		},
 		default_disabler_target_alone_player_chance = {
             chaos_armored_hound = 0.75,
@@ -204,7 +204,7 @@ local onslaught_settings = {
 			chaos_spawn = 2,
 			cultist_flamer = 3,
 			cultist_grenadier = 1,
-			cultist_mutant = 4,
+			cultist_mutant = 3,
 			flamer = 3,
 		--	grenadier = 3,
 			renegade_flamer = 3,
@@ -214,7 +214,7 @@ local onslaught_settings = {
 			chaos_armored_hound = 3,
 		},
 		always_update_at_challange_rating_breeds = {
-			cultist_mutant = 5,
+			cultist_mutant = 2,
 			renegade_sniper = 0,
 		},
 	}
@@ -368,7 +368,7 @@ end)
 
 -- SNIPER REPLACEMENTS
 local SNIPER_CHECK_INTERVAL = 1
-local MAX_SNIPER_LIFETIME = 30 -- in seconds
+local MAX_SNIPER_LIFETIME = 45 -- in seconds
 
 mod:hook(SpecialsPacing, "update", function(func, self, dt, t, side_id, target_side_id)
     func(self, dt, t, side_id, target_side_id)

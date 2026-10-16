@@ -34,10 +34,6 @@ renegade_comps.havoc_renegade_medium = {
 				name = "renegade_shocktrooper",
 				amount = { 3, 3 }
 			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
-			},
 		},
 	},
 	{
@@ -65,10 +61,6 @@ renegade_comps.havoc_renegade_medium = {
 			{
 				name = "renegade_assault",
 				amount = { 4, 4 }
-			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
 			},
 		},
 	},
@@ -121,15 +113,15 @@ renegade_comps.havoc_infected_medium = {
 			{
 				name = "renegade_executor",
 				amount = {
-					1,
-					1
+					2,
+					2
 				}
 			},
 			{
 				name = "cultist_berzerker",
 				amount = {
-					1,
-					1
+					5,
+					5
 				}
 			},
 			{
@@ -145,10 +137,6 @@ renegade_comps.havoc_infected_medium = {
 					2,
 					2
 				}
-			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
 			},
 		},
 	},
@@ -172,8 +160,8 @@ renegade_comps.havoc_infected_medium = {
 			{
 				name = "renegade_executor",
 				amount = {
-					2,
-					2
+					5,
+					5
 				}
 			},
 			{
@@ -254,10 +242,6 @@ renegade_comps.havoc_infected_large = {
 					2
 				}
 			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
-			},
 		},
 	},
 }
@@ -289,10 +273,7 @@ renegade_comps.infected_small = {
 				name = "renegade_shocktrooper",
 				amount = { 6, 6 }
 			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
-			},
+
 		},
 	},
 	{
@@ -418,7 +399,7 @@ renegade_comps.renegade_medium = {
 			{
 				name = "chaos_ogryn_gunner",
 				amount = {
-					0,
+					1,
 					1
 				},
 			},
@@ -454,10 +435,7 @@ renegade_comps.renegade_small = {
 				name = "renegade_shocktrooper",
 				amount = { 4, 4 }
 			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
-			},
+
 		},
 	},
 	{
@@ -747,10 +725,7 @@ renegade_comps.renegade_small_coordinated_ranged_horde = {
 					2
 				}
 			},
-			{
-				name = "renegade_sniper",
-				amount = { 0, 1 }
-			},
+
 		},
 	},
 }

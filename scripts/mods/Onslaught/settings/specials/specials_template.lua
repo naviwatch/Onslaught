@@ -43,6 +43,8 @@ local onslaught_settings = {
             "cultist_grenadier",
             "renegade_grenadier",
 			"renegade_netgunner",
+			"renegade_netgunner",
+			"renegade_sniper",
 			"renegade_sniper",
 			"flamer",
 			"flamer",
@@ -102,9 +104,9 @@ local onslaught_settings = {
 			chaos_beast_of_nurgle = 30,
 			chaos_hound = 25,
 			chaos_plague_ogryn = 30,
-			chaos_poxwalker_bomber = 25,
+			chaos_poxwalker_bomber = 20,
 			chaos_spawn = 30,
-			cultist_flamer = 20,
+			cultist_flamer = 15,
 			cultist_grenadier = 30,
 			cultist_mutant = 25,
 			renegade_flamer = 15,
@@ -202,16 +204,16 @@ local onslaught_settings = {
 			chaos_plague_ogryn = 2,
 			chaos_poxwalker_bomber = 5,
 			chaos_spawn = 2,
-			cultist_flamer = 3,
+			cultist_flamer = 4,
 			cultist_grenadier = 1,
 			cultist_mutant = 3,
-			flamer = 3,
+			flamer = 4,
 		--	grenadier = 3,
-			renegade_flamer = 3,
+			renegade_flamer = 4,
 			renegade_grenadier = 1,
 			renegade_netgunner = 3,
-			renegade_sniper = 2,
-			chaos_armored_hound = 3,
+			renegade_sniper = 3,
+			chaos_armored_hound = 2,
 		},
 		always_update_at_challange_rating_breeds = {
 			cultist_mutant = 2,
@@ -339,36 +341,36 @@ mod:hook(SpecialsPacing, "_spawn_special", function(func, self, specials_slot, s
 		and t >= (self._houndmaster_cooldown_t or 0)
 		and not _special_elite_slot_is_active(self._specials_slots)
 
-	if not can_override or math.random() >= settings.chance then
-		return func(self, specials_slot, side_id, target_side_id)
-	end
+	if can_override and math.random() < settings.chance then
+		local chosen_breed = special_elites[math.random(1, #special_elites)]
+		local original_breed_name = specials_slot.breed_name
+		local original_health_modifier = specials_slot.optional_health_modifier
+		local original_monster_breed_override = specials_slot.monster_breed_override
 
-	local chosen_breed = special_elites[math.random(1, #special_elites)]
+		specials_slot.breed_name = chosen_breed
+		specials_slot.optional_health_modifier = settings.health_modifier
+		specials_slot.monster_breed_override = true
 
-	local original_breed_name = specials_slot.breed_name
-	local original_health_modifier = specials_slot.optional_health_modifier
-	local original_monster_breed_override = specials_slot.monster_breed_override
+		local success, spawned_unit, spawner_queue_id, spawner = func(self, specials_slot, side_id, target_side_id)
 
-	specials_slot.breed_name = chosen_breed
-	specials_slot.optional_health_modifier = settings.health_modifier
-	specials_slot.monster_breed_override = true
+		if success then
+			self._houndmaster_cooldown_t = t + math.random_range(settings.cooldown[1], settings.cooldown[2])
+			return success, spawned_unit, spawner_queue_id, spawner
+		end
 
-	local success, spawned_unit, spawner_queue_id, spawner = func(self, specials_slot, side_id, target_side_id)
-
-	if success then
-		self._houndmaster_cooldown_t = t + math.random_range(settings.cooldown[1], settings.cooldown[2])
-	else
 		specials_slot.breed_name = original_breed_name
 		specials_slot.optional_health_modifier = original_health_modifier
 		specials_slot.monster_breed_override = original_monster_breed_override
 	end
+	
+	local success, spawned_unit, spawner_queue_id, spawner = func(self, specials_slot, side_id, target_side_id)
 
 	return success, spawned_unit, spawner_queue_id, spawner
 end)
 
 -- SNIPER REPLACEMENTS
-local SNIPER_CHECK_INTERVAL = 1
-local MAX_SNIPER_LIFETIME = 45 -- in seconds
+local SNIPER_CHECK_INTERVAL = 0.5
+local MAX_SNIPER_LIFETIME = 25 -- in seconds
 
 mod:hook(SpecialsPacing, "update", function(func, self, dt, t, side_id, target_side_id)
     func(self, dt, t, side_id, target_side_id)
@@ -403,7 +405,7 @@ mod:hook(SpecialsPacing, "update", function(func, self, dt, t, side_id, target_s
                                 self:_setup_specials_slot(specials_slots, slot, self._template, self._timer_modifier)
                                 
 								if mod.debug_mode then
-                                	mod:echo("Forcibly freed slot " .. i .. " from this fuckass sniper who wont die")
+                                	mod:echo("Forcibly freed slot " .. i .. " from sniper who wont die")
 								end
                             end
                         end

@@ -399,7 +399,7 @@ renegade_comps.renegade_medium = {
 			{
 				name = "chaos_ogryn_gunner",
 				amount = {
-					1,
+					0,
 					1
 				},
 			},

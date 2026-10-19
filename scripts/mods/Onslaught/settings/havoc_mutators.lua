@@ -32,7 +32,7 @@ mod:hook_require("scripts/settings/circumstance/templates/havoc_circumstance_tem
 			"mutator_havoc_more_points_allowed_terror_event",
 			"mutator_more_boss_patrols", -- more patrols
             "mutator_more_monsters",
-			"special_elites"
+			"special_elites",
     }	
 	-- fading light 1
 	template.mutator_increased_difficulty.mutators = table.clone(template.mutator_highest_difficulty.mutators)

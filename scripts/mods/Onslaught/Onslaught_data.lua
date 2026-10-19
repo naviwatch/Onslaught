@@ -22,6 +22,22 @@ return {
 				default_value = false,
 			},
 			{
+				setting_id = "debug_hud_x",
+				type = "numeric",
+				default_value = 20,
+				range = { -2000, 2000 },
+				decimals_number = 0,
+				step_size_value = 1,
+			},
+			{
+				setting_id = "debug_hud_y",
+				type = "numeric",
+				default_value = 20,
+				range = { -2000, 2000 },
+				decimals_number = 0,
+				step_size_value = 1,
+			},
+			{
 				setting_id = "tp",
 				type = "keybind",
 				default_value = {},

@@ -1168,8 +1168,76 @@ BreedActions.chaos_ogryn_houndmaster.summon.breed_data = {
 BreedActions.renegade_grenadier.throw_grenade.cooldown = MinionDifficultySettings.cooldowns.cultist_grenadier_throw
 BreedActions.renegade_grenadier.quick_throw_grenade.cooldown = MinionDifficultySettings.cooldowns.cultist_grenadier_throw
 
--- SNIPERS: MOVE FASTER WITHOUT LOS
-BreedActions.renegade_sniper.shoot.lost_los_fail_duration = 15
+-- NET: SPEED CHANGES & DETECTION RANGE ADJUSTMENTS
+local breed_renegade_netgunner = require("scripts/settings/breed/breeds/renegade/renegade_netgunner_breed")
+
+breed_renegade_netgunner.run_speed = 6.5
+breed_renegade_netgunner.walk_speed = 3.5
+BreedActions.renegade_netgunner.approach_target.speed = 6.5
+
+mod:hook_require("scripts/extension_systems/perception/minion_perception_extension", function(MinionPerceptionExtension)
+	mod:hook(MinionPerceptionExtension, "_within_detection_los_range", function(func, self, unit, unit_position, target_unit, target_position)
+		local within_range, clear_last_los_position = func(self, unit, unit_position, target_unit, target_position)
+
+		if within_range or self._breed.name ~= "renegade_netgunner" then
+			return within_range, clear_last_los_position
+		end
+
+		local target_distance_squared = Vector3.distance_squared(unit_position, target_position)
+
+		if target_distance_squared <= 25 or target_distance_squared > 100 then
+			return within_range, clear_last_los_position
+		end
+
+		local target_buff_extension = ScriptUnit.has_extension(target_unit, "buff_system")
+
+		if not target_buff_extension or not target_buff_extension:has_keyword("concealed") then
+			return within_range, clear_last_los_position
+		end
+
+		local ignore_detection_los_modifiers = self._ignore_detection_los_modifiers
+
+		self._ignore_detection_los_modifiers = true
+		within_range, clear_last_los_position = func(self, unit, unit_position, target_unit, target_position)
+		self._ignore_detection_los_modifiers = ignore_detection_los_modifiers
+
+		return within_range, clear_last_los_position
+	end)
+end)
+
+-- NET: Enable collision after being dragged for 0.7 seconds to avoid cross-country drag bullshit
+local NETTED_MINION_COLLISION_DELAY = 0.7
+
+mod:hook_require("scripts/extension_systems/character_state_machine/character_states/player_character_state_netted", function(PlayerCharacterStateNetted)
+	mod:hook_safe(PlayerCharacterStateNetted, "on_enter", function(self)
+		self._locomotion_steering_component.disable_minion_collision = false
+		self._onslaught_minion_collision_enable_t = self._character_state_component.entered_t + NETTED_MINION_COLLISION_DELAY
+	end)
+
+	mod:hook_safe(PlayerCharacterStateNetted, "fixed_update", function(self, unit, dt, t)
+		local enable_t = self._onslaught_minion_collision_enable_t
+
+		if enable_t and t >= enable_t then
+			self._locomotion_steering_component.disable_minion_collision = false
+			self._onslaught_minion_collision_enable_t = nil
+		end
+	end)
+
+	mod:hook_safe(PlayerCharacterStateNetted, "on_exit", function(self)
+		self._onslaught_minion_collision_enable_t = nil
+	end)
+end)
+
+local breed_renegade_sniper = require("scripts/settings/breed/breeds/renegade/renegade_sniper_breed")
+
+-- SNIPERS: SEE THROUGH SMOKE AND PUSH FORWARD MORE AGGRESSIVELY
+breed_renegade_sniper.ignore_smoke_fog_los = true
+breed_renegade_sniper.max_distance_from_combat_vector = 70
+breed_renegade_sniper.cover_config.min_distance_from_target = 12
+breed_renegade_sniper.cover_config.max_distance_from_target = 35
+breed_renegade_sniper.cover_config.leave_cover_after_losing_los_duration = 5
+breed_renegade_sniper.combat_vector_config.choose_furthest_away = false
+BreedActions.renegade_sniper.shoot.lost_los_fail_duration = 3
 
 -- RENEGADE FLAMER MUTATOR: Add the explosive backpack
 local HitZone = require("scripts/utilities/attack/hit_zone")
@@ -1284,6 +1352,7 @@ end)
 -- Experimental targetting behavior changes
 local breed_renegade_executor = require("scripts/settings/breed/breeds/renegade/renegade_executor_breed")
 local breed_chaos_ogryn_bulwark = require("scripts/settings/breed/breeds/chaos/chaos_ogryn_bulwark_breed")
+
 local TargetSelectionTemplates = require("scripts/extension_systems/perception/target_selection_templates")
 
 local Breed = require("scripts/utilities/breed")
@@ -1316,7 +1385,7 @@ local function _calculate_distance_and_backline_weight(target_selection_weights,
     return distance_weight, inverse_radius
 end
 
-local function _calculate_score(breed, unit, target_unit, distance_sq, is_new_target, threat_units, perception_component, t, debug_target_weighting_or_nil)
+local function _calculate_score_bulwark(breed, unit, target_unit, distance_sq, is_new_target, threat_units, perception_component, t, debug_target_weighting_or_nil)
     local target_selection_weights = breed.target_selection_weights
     local target_unit_data_extension = ScriptUnit.extension(target_unit, "unit_data_system")
     local target_breed = target_unit_data_extension:breed()
@@ -1374,7 +1443,7 @@ TargetSelectionTemplates.custom_backline_melee_elite = function (unit, side, per
             best_score = -math.huge
         else
             local is_new_target = false
-            best_score = _calculate_score(breed, unit, current_target_unit, distance_sq - stickiness, is_new_target, threat_units, perception_component, t, debug_target_weighting_or_nil)
+            best_score = _calculate_score_bulwark(breed, unit, current_target_unit, distance_sq - stickiness, is_new_target, threat_units, perception_component, t, debug_target_weighting_or_nil)
         end
     else
         best_target_unit, closest_distance_sq, closest_z_distance = nil, math.huge, math.huge
@@ -1415,7 +1484,7 @@ TargetSelectionTemplates.custom_backline_melee_elite = function (unit, side, per
 
                     if aggro_state == aggro_states.aggroed or check_distance_sq < detection_radius_sq then
                         local is_new_target = true
-                        local score = _calculate_score(breed, unit, target_unit, distance_to_target_sq, is_new_target, threat_units, perception_component, t, debug_target_weighting_or_nil)
+                        local score = _calculate_score_bulwark(breed, unit, target_unit, distance_to_target_sq, is_new_target, threat_units, perception_component, t, debug_target_weighting_or_nil)
 
                         if best_score < score then
                             local has_line_of_sight = line_of_sight_lookup[target_unit]
@@ -1444,6 +1513,7 @@ TargetSelectionTemplates.custom_backline_melee_elite = function (unit, side, per
 
     return best_target_unit
 end
+
 
 breed_renegade_executor.target_selection_template = TargetSelectionTemplates.melee
 breed_chaos_ogryn_bulwark.target_selection_template = TargetSelectionTemplates.custom_backline_melee_elite

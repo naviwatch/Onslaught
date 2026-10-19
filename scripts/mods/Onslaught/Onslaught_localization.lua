@@ -13,5 +13,5 @@ return {
 	},
 	giga_specials = {
 		en = "Massively increased special amounts"
-	}
+	},
 }

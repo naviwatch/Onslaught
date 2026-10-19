@@ -30,35 +30,35 @@ end)
 
 local tpLocations = {
 	-- Archivum Sycorax
-	-- ["cm_archives"] = {
-		-- { XX, XX, XX, XX },
-		-- { XX, XX, XX, XX }
-	-- }
+	["cm_archives"] = {
+		{ 60.67, 36.41, -16.95, 180.0 },
+		{ -348.40, -149.26, -45.92, 135.0 }
+	},
 	-- Ascension Riser
 	-- ["dm_rise"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Chasm Logistratum
 	-- ["lm_rails"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Chasm Station
 	-- ["km_station"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Clandestium Gloriana
 	-- ["core_research"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Comms Plex
 	-- ["hm_complex"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
     -- Consignment Yard
     ["fm_cargo"] = {
         { -198.21, -43.18, -5.41, 198.7 },
@@ -78,17 +78,17 @@ local tpLocations = {
 	-- ["lm_scavenge"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Hab Dreyko
 	-- ["cm_habs"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Magistrati Oubliette
 	-- ["km_enforcer"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
     -- Mercantile
     ["fm_armoury"] = {
         { -215.69, -308.51, 1.67, 140.1 },
@@ -103,37 +103,37 @@ local tpLocations = {
 	-- ["hm_strain"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Relay Station
 	["dm_propaganda"] = {
 		{ 46.68, -44.15, -1.00, 90.9 },
 		{ -249.75, 112.96, -3.02, 72.7 }
-	}
+	},
 	-- Silo Cluster
 	-- ["dm_stockpile"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Smelter Complex
 	-- ["dm_forge"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Spillway
 	-- ["spillway"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Vigil Station Oblivium
 	-- ["hm_cartel"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 	-- Warren
 	-- ["cm_raid"] = {
 		-- { XX, XX, XX, XX },
 		-- { XX, XX, XX, XX }
-	-- }
+	-- },
 }
 
 local NDX = 0
@@ -203,6 +203,10 @@ mod.toevent = function()
         mod:echo("Do NOT move forward! DELETE ALL ENEMIES HERE before proceeding, or else you will despawn the passive enemies inside the end-event!")
 	elseif mission_name == "km_heresy" and idx == 2 then
 		mod:echo("Do NOT move forward! DELETE ALL ENEMIES HERE before proceeding, or else you will despawn the passive enemies inside the end-event!")
+	elseif mission_name == "cm_archives" and idx == 1 then
+		mod:echo("Horde pacing is active until you press the button. DELETE ONGOING HORDE WAVES HERE!")
+	elseif mission_name == "cm_archives" and idx == 2 then
+		mod:echo("Horde pacing is active until you start the event. DELETE ONGOING HORDE WAVES HERE!")
 	end
 
     for _, player in pairs(Managers.player:human_players()) do

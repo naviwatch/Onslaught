@@ -70,6 +70,11 @@ mod:hook_require("scripts/managers/terror_event/terror_event_nodes", function(Te
 	if mod.register_vortex_nodes then
 		mod.register_vortex_nodes(TerrorEventNodes)
 	end
+	
+	-- onslaught_spawn_wizard_float / onslaught_despawn_wizard_float (in wizard_float.lua)
+	if mod.register_wizard_float_nodes then
+		mod.register_wizard_float_nodes(TerrorEventNodes)
+	end
 end)
 
 local function apply_buffs(unit, buffs, t)
@@ -134,5 +139,10 @@ mod.on_game_state_changed = function(status, state_name)
 	-- clear sand vortex
 	if mod.clear_vortex_state then
 		mod.clear_vortex_state()
+	end
+	
+	-- clear wizard_float
+	if mod.clear_wizard_float_state then
+		mod.clear_wizard_float_state()
 	end
 end

@@ -3,6 +3,7 @@ local mod = get_mod("Onslaught")
 
 mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/event_settings/points_load")
 mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/sand_vortex")
+mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/wizard_float")
 mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/functions") 
 
 -- because i dont know when fatshark will decide to change up the events, so we'll hook into terror_event_templates and override it with our own version of the same template
@@ -15,7 +16,8 @@ mod:hook_require("scripts/settings/terror_event/terror_event_templates", functio
     local fm_resurgence = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/baross")
 	local dm_propaganda = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/relay_station")
     local km_heresy = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/dark_communion")
-    
+    local cm_archives = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/archivum_sycorax")
+	
     --[[
     for key, _ in pairs(instance) do
         mod:echo(string.format("[DEBUG] Terror Event Template Key: %s", key))
@@ -34,6 +36,8 @@ mod:hook_require("scripts/settings/terror_event/terror_event_templates", functio
 	instance["terror_events_dm_propaganda"] = dm_propaganda
     -- Dark Communion
     instance["terror_events_km_heresy"] = km_heresy
+	-- Archivum Sycorax
+	instance["terror_events_cm_archives"] = cm_archives
 end)
 
 local TerrorEventManager = require("scripts/managers/terror_event/terror_event_manager")

@@ -17,6 +17,7 @@ mod:hook_require("scripts/settings/terror_event/terror_event_templates", functio
 	local dm_propaganda = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/relay_station")
     local km_heresy = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/dark_communion")
     local cm_archives = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/archivum_sycorax")
+    local dm_stockpile = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/events/maps/silo_cluster") 
 	
     --[[
     for key, _ in pairs(instance) do
@@ -34,6 +35,8 @@ mod:hook_require("scripts/settings/terror_event/terror_event_templates", functio
     instance["terror_events_fm_resurgence"] = fm_resurgence
 	-- Relay Station
 	instance["terror_events_dm_propaganda"] = dm_propaganda
+	-- Silo Cluster
+	instance["terror_events_dm_stockpile"] = dm_stockpile
     -- Dark Communion
     instance["terror_events_km_heresy"] = km_heresy
 	-- Archivum Sycorax

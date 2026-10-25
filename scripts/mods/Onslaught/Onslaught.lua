@@ -1,6 +1,6 @@
 local mod = get_mod("Onslaught")
 
-mod:echo("Onslaught v0.6.5")
+mod:echo("Onslaught v0.6.6")
 
 -- Normal Pacing
 mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/pacing")

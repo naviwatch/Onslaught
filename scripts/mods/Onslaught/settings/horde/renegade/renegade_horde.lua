@@ -399,8 +399,8 @@ renegade_comps.renegade_medium = {
 			{
 				name = "chaos_ogryn_gunner",
 				amount = {
-					0,
-					1
+					1,
+					2
 				},
 			},
 		},
@@ -428,7 +428,7 @@ renegade_comps.renegade_small = {
 				amount = { 10, 15 }
 			},
 			{
-				name = "renegade_berzerker",
+				name = "cultist_berzerker",
 				amount = { 3, 3 }
 			},
 			{

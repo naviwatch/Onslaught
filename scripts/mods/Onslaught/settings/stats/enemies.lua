@@ -10,6 +10,9 @@ local breed_renegade_twin_captain_two = require("scripts/settings/breed/breeds/r
 breed_renegade_twin_captain.clamp_health_percent_damage = 0.1 -- 0.2
 breed_renegade_twin_captain_two.clamp_health_percent_damage = 0.1 -- 0.2
 
+-- TWINS: Ranged twin ignore smoke
+breed_renegade_twin_captain.ignore_smoke_fog_los = true
+
 -- TOX BOMBER GAS & BEAST OF NURGLE SLIME: Lower duration
 mod:hook_require("scripts/settings/liquid_area/liquid_area_templates/minion_liquid_area_templates", function(templates)
     templates.cultist_grenadier_gas.life_time = 8 -- 16
@@ -53,6 +56,8 @@ local MinionDifficultySettings = require("scripts/settings/difficulty/minion_dif
 local MinionPushFx = require("scripts/utilities/minion_push_fx")
 local PowerLevelSettings = require("scripts/settings/damage/power_level_settings")
 local PushSettings = require("scripts/settings/damage/push_settings")
+local AttackSettings = require("scripts/settings/damage/attack_settings")
+local BuffSettings = require("scripts/settings/buff/buff_settings")
 
 local armor_types = ArmorSettings.types
 local push_templates = PushSettings.push_templates
@@ -383,6 +388,12 @@ mod:hook_require("scripts/settings/damage/damage_profiles/minion_damage_profile_
 	profiles.modify("renegade_captain_void_shield_explosion", {
 		power_distribution = { attack = 0 }, -- 0.2
 	})
+	-- CAPTAIN SHIELD BREAK: retain the burst but remove its player pushback
+	profiles.copy("renegade_captain_toughness_depleted_no_push", "renegade_captain_toughness_depleted", {
+		push_template = REMOVE,
+		ogryn_push_template = REMOVE,
+		ragdoll_push_force = 0,
+	})
 	-- MUTANT: SMASH
 	profiles.modify("cultist_mutant_smash", {
 		power_distribution = { attack = 0.075 }, -- 0.1
@@ -492,23 +503,103 @@ mod:hook(BtVoidShieldExplosionAction, "_deal_damage", function (func, self, t, u
 	end
 end)
 
--- CAPTAINS: Spawn with both powersword and powermaul, allow to switch melee weapons mid-fight
-local function select_both_melee_weapons(templates, names)
-	for _, name in ipairs(names) do
-		local template = templates[name]
+-- RENEGADE CAPTAIN: Keep only powersword, kick and frag grenade
+mod:hook_require("scripts/settings/minion_attack_selection/templates/renegade_captain_attack_selection_templates", function(templates)
+	local all_categories = templates.renegade_captain_all.categories
 
-		if template and template.amount_from_category.melee then
-			template.amount_from_category.melee = 2 -- 1
+	for category in pairs(all_categories) do
+		if category ~= "melee" and category ~= "kick" and category ~= "grenade" then
+			all_categories[category] = nil
 		end
 	end
-end
 
-mod:hook_require("scripts/settings/minion_attack_selection/templates/renegade_captain_attack_selection_templates", function(templates)
-	select_both_melee_weapons(templates, { "renegade_captain_default", "renegade_captain_melee", "renegade_captain_plasma_pistol" })
+	all_categories.melee = {
+		{
+			required_weapon_slot_name = "slot_power_sword",
+			attack_names = { "power_sword_melee_combo_attack" },
+		},
+	}
+	all_categories.grenade = {
+		{
+			attack_names = { "frag_grenade" },
+		},
+	}
+
+	if templates.renegade_captain_plasma_pistol then
+		templates.renegade_captain_plasma_pistol.categories = all_categories
+	end
+
+	for _, name in ipairs({
+		"renegade_captain_all",
+		"renegade_captain_default",
+		"renegade_captain_melee",
+		"renegade_captain_ranged",
+		"renegade_captain_plasma_pistol",
+	}) do
+		local template = templates[name]
+
+		if template then
+			template.amount_from_category = {
+				melee = 1,
+				kick = 1,
+				grenade = 1,
+			}
+			template.multi_selection = nil
+		else
+			mod:error("Captain twin moveset: attack selection template '%s' not found", name)
+		end
+	end
 end)
 
+-- RENEGADE CAPTAIN: Shield
+local MinionToughnessTemplate = require("scripts/settings/toughness/minion_toughness_templates")
+
+MinionToughnessTemplate.renegade_captain.max = { 0, 0, 0, 0, 0 }
+MinionToughnessTemplate.renegade_captain.max_hit_percent = { 0.08, 0.08, 0.08, 0.08, 1 }
+MinionToughnessTemplate.renegade_captain.depleted_settings.stagger_strength_multiplier = 0
+MinionToughnessTemplate.renegade_captain.stagger_duration = { 0, 0, 0, 0, 0 }
+MinionToughnessTemplate.renegade_captain.ignore_flickering_on_depleted = true
+
+-- RENEGADE CAPTAIN: No boss bar, spawn with melee
+local breed_renegade_captain = require("scripts/settings/breed/breeds/renegade/renegade_captain_breed")
+
+breed_renegade_captain.boss_health_bar_disabled = true
+breed_renegade_captain.trigger_boss_health_bar_on_aggro = false
+breed_renegade_captain.trigger_boss_health_bar_on_damaged = false
+breed_renegade_captain.spawn_anim_state = "to_melee"
+breed_renegade_captain.spawn_inventory_slot = "slot_power_sword"
+
+-- CULTIST CAPTAIN: Keep both melee weapons available and allow switching mid-fight, also give him everything
 mod:hook_require("scripts/settings/minion_attack_selection/templates/cultist_captain_attack_selection_templates", function(templates)
+	local ranged = templates.cultist_captain_all.categories.ranged
 	local melee = templates.cultist_captain_default.categories.melee
+
+	local function count_attacks(entries)
+		local num_attacks = 0
+
+		for _, entry in ipairs(entries) do
+			num_attacks = num_attacks + #entry.attack_names
+		end
+
+		return num_attacks
+	end
+
+	local function add_ranged_weapon(slot_name, attack_names)
+		for _, entry in ipairs(ranged) do
+			if entry.required_weapon_slot_name == slot_name then
+				return
+			end
+		end
+
+		table.insert(ranged, {
+			required_weapon_slot_name = slot_name,
+			attack_names = attack_names,
+		})
+	end
+
+	add_ranged_weapon("slot_hellgun", { "hellgun_spray_and_pray" })
+	add_ranged_weapon("slot_plasma_pistol", { "plasma_pistol_shoot" })
+
 	local has_power_sword = false
 
 	for _, entry in ipairs(melee) do
@@ -525,13 +616,109 @@ mod:hook_require("scripts/settings/minion_attack_selection/templates/cultist_cap
 		})
 	end
 
-	templates.cultist_captain_all.amount_from_category.melee = 2
-	select_both_melee_weapons(templates, { "cultist_captain_default", "cultist_captain_melee" })
+	local num_melee_attacks = count_attacks(melee)
+	local num_ranged_attacks = count_attacks(ranged)
+
+	for _, name in ipairs({
+		"cultist_captain_all",
+		"cultist_captain_default",
+		"cultist_captain_melee",
+		"cultist_captain_ranged",
+	}) do
+		local template = templates[name]
+
+		if template then
+			template.amount_from_category.ranged = num_ranged_attacks
+
+			if name ~= "cultist_captain_ranged" then
+				template.amount_from_category.melee = num_melee_attacks
+			end
+		else
+			mod:error("Cultist captain arsenal: attack selection template '%s' not found", name)
+		end
+	end
+end)
+
+local RenegadeCaptainActions = require("scripts/settings/breed/breed_actions/renegade/renegade_captain_actions")
+local RenegadeTwinCaptainActions = require("scripts/settings/breed/breed_actions/renegade/renegade_twin_captain_actions")
+local RenegadeTwinCaptainTwoActions = require("scripts/settings/breed/breed_actions/renegade/renegade_twin_captain_two_actions")
+
+local TWIN_CAPTAIN_GRENADE_ACTIONS = {
+	"quick_throw_grenade",
+	"multiple_quick_throw_grenade",
+	"throw_grenade",
+}
+
+local TWIN_CAPTAIN_TWO_MOVE_ACTIONS = {
+	"melee_follow",
+	"kick",
+	"dash",
+	"random_dash",
+	"dash_fast",
+	"random_dash_short",
+	"power_sword_melee_combo_attack",
+	"power_sword_melee_sweep",
+	"power_sword_moving_melee_sweep",
+	"dash_and_sweep",
+	"empowered_dash_and_sweep",
+}
+
+local TWIN_DASH_ACTIONS = {
+	dash = true,
+	dash_fast = true,
+	random_dash = true,
+	random_dash_short = true,
+}
+
+-- RENEGADE CAPTAIN: Use the twin captain's complete combat move data.
+for _, action_name in ipairs(TWIN_CAPTAIN_TWO_MOVE_ACTIONS) do
+	local twin_action = RenegadeTwinCaptainTwoActions[action_name]
+
+	if twin_action then
+		local action = table.clone(twin_action)
+
+		if TWIN_DASH_ACTIONS[action_name] then
+			local considerations = action.considerations
+
+			considerations.has_line_of_sight = nil
+			considerations.distance_to_target.max_value = 100
+			considerations.distance_to_target.spline = {
+				0,
+				0,
+				0.05,
+				0,
+				0.15,
+				1,
+				0.8,
+				1,
+				1,
+				0,
+			}
+		end
+
+		RenegadeCaptainActions[action_name] = action
+	else
+		mod:error("Captain twin moveset: twin action '%s' not found", action_name)
+	end
+end
+
+RenegadeCaptainActions.melee_follow.utility_weight = 100
+
+mod:hook_require("scripts/settings/breed/breeds/cultist/cultist_captain_breed", function(breed)
+	local blackboard_component_config = table.clone(breed.blackboard_component_config)
+
+	blackboard_component_config.throw_grenade = {
+		anim_event = "string",
+		next_throw_at_t = "number",
+		throw_direction = "Vector3Box",
+		throw_position = "Vector3Box",
+		wanted_rotation = "QuaternionBox",
+	}
+
+	breed.blackboard_component_config = blackboard_component_config
 end)
 
 -- Fix broken sword kick combo for cultist captain
-local RenegadeCaptainActions = require("scripts/settings/breed/breed_actions/renegade/renegade_captain_actions")
-
 mod:hook_require("scripts/settings/breed/breed_actions/cultist/cultist_captain_actions", function(action_data)
 	action_data.power_sword_melee_combo_attack = table.clone(RenegadeCaptainActions.power_sword_melee_combo_attack)
 end)
@@ -549,11 +736,118 @@ local CAPTAIN_BREEDS = {
 	renegade_captain = true,
 	cultist_captain = true,
 }
+
+-- Issues with hellgun visibility not turning off when not selected
+mod:hook_require("scripts/extension_systems/visual_loadout/minion_visual_loadout_extension", function(MinionVisualLoadoutExtension)
+	local function sync_hellgun_visibility(self)
+		if self._breed_name ~= "cultist_captain" then
+			return
+		end
+
+		local slot_name = "slot_hellgun"
+		local slot_data = self:slot_item(slot_name)
+
+		if not slot_data then
+			return
+		end
+
+		local should_be_visible = self:wielded_slot_name() == slot_name
+
+		if slot_data.visible ~= should_be_visible then
+			if self._is_server then
+				self:set_slot_visibility(slot_name, should_be_visible)
+			else
+				self:_set_slot_visibility(slot_name, should_be_visible)
+			end
+		end
+	end
+
+	mod:hook_safe(MinionVisualLoadoutExtension, "_wield_slot", sync_hellgun_visibility)
+	mod:hook_safe(MinionVisualLoadoutExtension, "_unwield_slot", sync_hellgun_visibility)
+
+	mod:hook_safe(MinionVisualLoadoutExtension, "init", function(self, extension_init_context, unit, extension_init_data, game_object_data_or_game_session, nil_or_game_object_id)
+		if self._breed_name == "cultist_captain" and self:slot_item("slot_hellgun") then
+			self:_set_slot_visibility("slot_hellgun", false)
+		end
+	end)
+end)
+
+--[[
+-- CAPTAINS: Allow one shield reactivation at or below 50% health
+mod:hook_require("scripts/settings/toughness/minion_toughness_templates", function(templates)
+	for breed_name in pairs(CAPTAIN_BREEDS) do
+		local template = templates[breed_name]
+
+		if template then
+			template.regeneration_speed = 0
+			template.regenerate_full_delay = { math.huge, math.huge, math.huge, math.huge, math.huge }
+
+			if template.depleted_settings and template.depleted_settings.explosion_template then
+				local depleted_settings = table.clone(template.depleted_settings)
+				local explosion_template = table.clone(depleted_settings.explosion_template)
+				local damage_profile = DamageProfileTemplates.renegade_captain_toughness_depleted_no_push
+
+				if not damage_profile then
+					mod:error("Captain shield break: no-push damage profile was not created")
+				else
+					explosion_template.damage_profile = damage_profile
+					explosion_template.close_damage_profile = damage_profile
+					depleted_settings.explosion_template = explosion_template
+					template.depleted_settings = depleted_settings
+				end
+			end
+		else
+			mod:error("Captain shield reactivation: toughness template '%s' not found", breed_name)
+		end
+	end
+end)
+
+mod:hook_require("scripts/extension_systems/toughness/minion_toughness_extension", function(MinionToughnessExtension)
+	mod:hook(MinionToughnessExtension, "break_shield", function(func, self, attack_direction, optional_ignore_stagger, optional_regenerate_full_delay_t)
+		if self._onslaught_captain_shield then
+			return func(self, attack_direction, true, optional_regenerate_full_delay_t)
+		end
+
+		return func(self, attack_direction, optional_ignore_stagger, optional_regenerate_full_delay_t)
+	end)
+
+	mod:hook_safe(MinionToughnessExtension, "init", function(self, extension_init_context, unit, extension_init_data)
+		local breed = extension_init_data.breed
+
+		self._onslaught_captain_shield = breed and CAPTAIN_BREEDS[breed.name] or false
+	end)
+
+	mod:hook(MinionToughnessExtension, "_update_toughness", function(func, self, dt, t)
+		if self._onslaught_captain_shield then
+			self._min_health_allowed = nil
+
+			local health_extension = self._health_extension
+
+			-- Don't update toughness at all
+			if not self._captain_shield_reactivated and health_extension
+				and self._toughness_damage >= self._max_toughness
+				and health_extension:current_health() <= 0
+			then
+				self._captain_shield_reactivated = true
+				self:set_toughness_damage(0, true)
+			end
+		end
+
+		return func(self, dt, t)
+	end)
+end)
+]]
+
 local PHASE_SWITCH_BLOCKING_ACTIONS = {
+	dash = true,
+	dash_fast = true,
+	random_dash = true,
+	random_dash_short = true,
 	power_sword_melee_attack = true,
 	power_sword_melee_combo_attack = true,
 	power_sword_melee_sweep = true,
 	power_sword_moving_melee_attack = true,
+	power_sword_moving_melee_sweep = true,
 	powermaul_ground_slam = true,
 	powermaul_melee_attack = true,
 	powermaul_melee_cleave = true,
@@ -593,10 +887,21 @@ mod:hook_require("scripts/extension_systems/behavior/combat_range_user_behavior_
 	end)
 end)
 
+local CAPTAIN_GRENADE_BLOCKING_ATTACKS = {
+	powermaul_ground_slam = true,
+	power_sword_melee_sweep = true,
+	power_sword_moving_melee_sweep = true,
+}
+local captain_grenade_blocked_after_attack = setmetatable({}, { __mode = "k" })
+
 mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bt_melee_attack_action", function(BtMeleeAttackAction)
 	mod:hook_safe(BtMeleeAttackAction, "leave", function(self, unit, breed, blackboard, scratchpad, action_data, t, reason, destroy)
 		if destroy or not CAPTAIN_BREEDS[breed.name] then
 			return
+		end
+
+		if CAPTAIN_GRENADE_BLOCKING_ATTACKS[action_data.name] then
+			captain_grenade_blocked_after_attack[unit] = true
 		end
 
 		local behavior_extension = ScriptUnit.has_extension(unit, "behavior_system")
@@ -610,7 +915,7 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bt_melee_atta
 end)
 
 -- CAPTAINS: Enable grenade throw action (renegade = frag; cultist = fire)
-local GRENADE_COOLDOWN = 12
+local GRENADE_COOLDOWN = 8
 
 local function find_bt_node(node, name)
 	if node.name == name then
@@ -630,11 +935,24 @@ local function find_bt_node(node, name)
 	end
 end
 
+local BtQuickGrenadeThrowAction = require("scripts/extension_systems/behavior/nodes/actions/bt_quick_grenade_throw_action")
+
+mod:hook(BtQuickGrenadeThrowAction, "enter", function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
+	if CAPTAIN_BREEDS[breed.name] then
+		local navigation_extension = ScriptUnit.extension(unit, "navigation_system")
+
+		navigation_extension:set_enabled(false)
+	end
+
+	return func(self, unit, breed, blackboard, scratchpad, action_data, t)
+end)
+
 local function setup_captain_grenade(action)
 	local considerations = table.clone(action.considerations)
 
 	considerations.is_available = nil -- always allowed
 	considerations.last_done_time.max_value = GRENADE_COOLDOWN * 2 -- results in our wanted minimum time
+	considerations.distance_to_target.max_value = 7 -- 12
 
 	action.considerations = considerations
 
@@ -644,33 +962,185 @@ local function setup_captain_grenade(action)
 	end
 end
 
--- RENEGADE CAPTAIN: swap the fire grenade node for frag grenade node
-mod:hook_require("scripts/extension_systems/behavior/trees/renegade/renegade_captain_behavior_tree", function(tree)
-	local specials = find_bt_node(tree, "renegade_captain_specials")
+local function clone_twin_moveset_node(node, action_names_by_twin_action)
 	local actions = BreedActions.renegade_captain
+	local copy = {}
 
-	for i = 1, #specials do
-		local child = specials[i]
+	for key, value in pairs(node) do
+		if key == "action_data" then
+			local action_name = action_names_by_twin_action[value]
 
-		if type(child) == "table" and child.name == "throw_fire_grenade" then
-			specials[i] = {
-				"BtQuickGrenadeThrowAction",
-				name = "throw_frag_grenade",
-				action_data = actions.throw_frag_grenade,
-				enter_hook = child.enter_hook,
-				leave_hook = child.leave_hook,
-			}
-
-			break
+			copy[key] = action_name and actions[action_name] or value
+		elseif type(value) == "table" then
+			copy[key] = clone_twin_moveset_node(value, action_names_by_twin_action)
+		else
+			copy[key] = value
 		end
 	end
+
+	return copy
+end
+
+local BtEnterHooks = require("scripts/extension_systems/behavior/utilities/bt_enter_hooks")
+local BtLeaveHooks = require("scripts/extension_systems/behavior/utilities/bt_leave_hooks")
+local BtConditions = require("scripts/extension_systems/behavior/utilities/bt_conditions")
+local captain_blocking_special_actions = setmetatable({}, { __mode = "k" })
+
+BtEnterHooks.captain_block_special_actions = function(unit, breed, blackboard, scratchpad, action_data, t, args)
+	captain_blocking_special_actions[unit] = true
+end
+
+BtLeaveHooks.captain_unblock_special_actions = function(unit, breed, blackboard, scratchpad, action_data, t, args, reason)
+	captain_blocking_special_actions[unit] = nil
+end
+
+mod:hook(BtConditions, "captain_can_use_special_actions", function(func, unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	if captain_blocking_special_actions[unit] then
+		return false
+	end
+
+	if captain_grenade_blocked_after_attack[unit] then
+		local move_state = blackboard.behavior.move_state
+
+		if move_state == "idle" or move_state == "moving" then
+			captain_grenade_blocked_after_attack[unit] = nil
+		else
+			return false
+		end
+	end
+
+	return func(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+end)
+
+-- RENEGADE CAPTAIN: Replace its combat options with the twin captain's moveset and keep only the frag grenade
+mod:hook_require("scripts/extension_systems/behavior/trees/renegade/renegade_captain_behavior_tree", function(tree)
+	local twin_tree = require("scripts/extension_systems/behavior/trees/renegade/renegade_twin_captain_two_behavior_tree")
+	local captain_combat = find_bt_node(tree, "renegade_captain_combat")
+	local twin_combat = find_bt_node(twin_tree, "combat")
+	local specials = find_bt_node(tree, "renegade_captain_specials")
+	local fire_grenade = find_bt_node(tree, "throw_fire_grenade")
+	local actions = BreedActions.renegade_captain
+
+	if not captain_combat or not twin_combat or not specials or not fire_grenade then
+		mod:error("Captain twin moveset: failed to find the combat or grenade nodes")
+		return
+	end
+
+	local action_names_by_twin_action = {}
+
+	for _, action_name in ipairs(TWIN_CAPTAIN_TWO_MOVE_ACTIONS) do
+		action_names_by_twin_action[RenegadeTwinCaptainTwoActions[action_name]] = action_name
+	end
+
+	local captain_combat_moves = clone_twin_moveset_node(twin_combat, action_names_by_twin_action)
+	local random_dash = find_bt_node(captain_combat_moves, "random_dash")
+
+	if not random_dash then
+		mod:error("Captain twin moveset: failed to find the random dash node")
+		return
+	end
+
+	random_dash.condition = "is_aggroed"
+
+	for i = 2, #captain_combat_moves do
+		local move = captain_combat_moves[i]
+
+		if move.name ~= "melee_follow" then
+			move.enter_hook = "captain_block_special_actions"
+			move.leave_hook = "captain_unblock_special_actions"
+		end
+	end
+
+	local frag_grenade = table.clone(fire_grenade)
+
+	frag_grenade.name = "throw_frag_grenade"
+	frag_grenade.action_data = actions.throw_frag_grenade
+
+	for i = #specials, 1, -1 do
+		specials[i] = nil
+	end
+
+	specials[1] = "BtRandomUtilityNode"
+	specials[2] = frag_grenade
+
+	for i = #captain_combat, 1, -1 do
+		captain_combat[i] = nil
+	end
+
+	captain_combat[1] = "BtSelectorNode"
+	captain_combat[2] = specials
+	captain_combat[3] = captain_combat_moves
 
 	setup_captain_grenade(actions.throw_frag_grenade)
 end)
 
 -- CULTIST CAPTAIN: Make fire grenade always available
+local Blackboard = require("scripts/extension_systems/blackboard/utilities/blackboard")
+local can_throw_grenade = BtConditions.can_throw_grenade
+
+BtConditions.cultist_captain_grenade_weapon_allowed = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	local visual_loadout_extension = ScriptUnit.extension(unit, "visual_loadout_system")
+
+	return visual_loadout_extension:wielded_slot_name() ~= "slot_powermaul"
+end
+
+BtConditions.cultist_captain_can_throw_grenade = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	if not BtConditions.cultist_captain_grenade_weapon_allowed(unit, blackboard, scratchpad, condition_args, action_data, is_running) then
+		return false
+	end
+
+	local throw_grenade_component = Blackboard.write_component(blackboard, "throw_grenade")
+
+	if throw_grenade_component.next_throw_at_t == nil then
+		throw_grenade_component.next_throw_at_t = 0
+	end
+
+	return can_throw_grenade(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+end
+
 mod:hook_require("scripts/extension_systems/behavior/trees/cultist/cultist_captain_behavior_tree", function(tree)
-	setup_captain_grenade(BreedActions.cultist_captain.throw_fire_grenade)
+	local specials = find_bt_node(tree, "renegade_captain_specials")
+	local fire_grenade = find_bt_node(tree, "throw_fire_grenade")
+	local actions = BreedActions.cultist_captain
+
+	if not specials or not fire_grenade then
+		mod:error("Cultist captain twin grenades: failed to find the grenade or special-action node")
+		return
+	end
+
+	for _, action_name in ipairs(TWIN_CAPTAIN_GRENADE_ACTIONS) do
+		local twin_action = RenegadeTwinCaptainActions[action_name]
+
+		if twin_action then
+			actions[action_name] = table.clone(twin_action)
+		else
+			mod:error("Cultist captain twin grenades: twin action '%s' not found", action_name)
+			return
+		end
+	end
+
+	local quick_throw_grenade = table.clone(fire_grenade)
+
+	quick_throw_grenade.name = "quick_throw_grenade"
+	quick_throw_grenade.action_data = actions.quick_throw_grenade
+
+	local multiple_quick_throw_grenade = table.clone(fire_grenade)
+
+	multiple_quick_throw_grenade.name = "multiple_quick_throw_grenade"
+	multiple_quick_throw_grenade.action_data = actions.multiple_quick_throw_grenade
+
+	local grenade_node = {
+		"BtRandomUtilityNode",
+		action_data = actions.throw_grenade,
+		quick_throw_grenade,
+		multiple_quick_throw_grenade,
+		condition = "cultist_captain_can_throw_grenade",
+		name = "throw_grenade",
+	}
+
+	fire_grenade.condition = "cultist_captain_grenade_weapon_allowed"
+	specials[#specials + 1] = grenade_node
+	setup_captain_grenade(actions.throw_fire_grenade)
 end)
 
 -- CULTIST CAPTAIN:: Give fire grenade fuse on impact to make the fuse sound play
@@ -680,9 +1150,7 @@ mod:hook_require("scripts/settings/projectile/minion_projectile_templates", func
 	fuse.impact_triggered = true -- nil
 	fuse.fuse_time = 1.2 -- 2
 end)
-
 -- BEAST OF NURGLE: Only consume targets with 3 vomit stacks
-local BtConditions = require("scripts/extension_systems/behavior/utilities/bt_conditions")
 local BON_VOMIT_BUFF = "chaos_beast_of_nurgle_hit_by_vomit"
 local REQUIRED_VOMIT_STACKS = 3
 
@@ -850,7 +1318,6 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bt_in_cover_a
 end)
 
 -- MUTANT: GRAB
-local BreedActions = require("scripts/settings/breed/breed_actions")
 BreedActions.cultist_mutant.charge.grab_anim_duration = {
     cryptic = 0.75, -- 1.5
     human = 0.75,  -- 1.5
@@ -1009,6 +1476,95 @@ local breed_chaos_poxwalker_bomber = require("scripts/settings/breed/breeds/chao
 
 breed_chaos_poxwalker_bomber.ignore_minion_push = true -- nil
 
+local MINION_BREED_TYPE = BreedSettings.types.minion
+local POXBURSTER_VERTICAL_PUSH_ANGLE = math.rad(30)
+local POXBURSTER_PUSH_RESULTS = {}
+
+mod:hook_require("scripts/utilities/attack/push_attack", function(PushAttack)
+	mod:hook(PushAttack, "push", function(func, physics_world, push_position, push_direction, rewind_ms, power_level, push_settings, attacking_unit, is_predicted, optional_weapon_item, weak_push)
+		local number_of_units_hit = func(physics_world, push_position, push_direction, rewind_ms, power_level, push_settings, attacking_unit, is_predicted, optional_weapon_item, weak_push)
+		local side_system = Managers.state.extension:system("side_system")
+		local side = side_system.side_by_unit[attacking_unit]
+		local enemy_side_names = side and side:relation_side_names("enemy")
+
+		if not enemy_side_names then
+			return number_of_units_hit
+		end
+
+		local radius = push_settings.push_radius
+		local max_range = radius + 1
+		local broadphase_system = Managers.state.extension:system("broadphase_system")
+		local broadphase = broadphase_system.broadphase
+		local query_radius = max_range / math.cos(POXBURSTER_VERTICAL_PUSH_ANGLE)
+		local num_results = broadphase.query(broadphase, push_position, query_radius, POXBURSTER_PUSH_RESULTS, enemy_side_names, MINION_BREED_TYPE)
+		local overlap_center = push_position + push_direction + Vector3(0, 0, 1)
+		local inner_push_angle = push_settings.inner_push_rad
+		local outer_push_angle = push_settings.outer_push_rad
+		local buff_extension = ScriptUnit.has_extension(attacking_unit, "buff_system")
+		local stat_buffs = buff_extension and buff_extension:stat_buffs()
+
+		inner_push_angle = inner_push_angle * (stat_buffs and stat_buffs.inner_push_angle_modifier or 1)
+		outer_push_angle = outer_push_angle * (stat_buffs and stat_buffs.outer_push_angle_modifier or 1)
+
+		for i = 1, num_results do
+			local target_unit = POXBURSTER_PUSH_RESULTS[i]
+
+			if ALIVE[target_unit] then
+				local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+				local target_position = POSITION_LOOKUP[target_unit]
+
+				if unit_data_extension and unit_data_extension:breed().name == "chaos_poxwalker_bomber" and target_position then
+					local target_breed = unit_data_extension:breed()
+					local to_target = target_position - push_position
+					local flat_to_target = Vector3.flat(to_target)
+					local horizontal_distance = Vector3.length(flat_to_target)
+					local vertical_angle = math.atan(math.abs(to_target.z) / math.max(horizontal_distance, 0.001))
+					local collision_margin = (target_breed.broadphase_radius or 1) * 0.5
+					local beyond_original_overlap = Vector3.distance_squared(target_position, overlap_center) > (radius + collision_margin)^2
+					local in_vertical_push_range = vertical_angle <= POXBURSTER_VERTICAL_PUSH_ANGLE and horizontal_distance <= max_range
+
+					if beyond_original_overlap and in_vertical_push_range then
+						local attack_direction = Vector3.normalize(flat_to_target)
+						local angle = Vector3.angle(attack_direction, push_direction, true)
+						local damage_profile
+						local damage_type
+
+						if weak_push then
+							damage_profile = push_settings.outer_damage_profile
+							damage_type = push_settings.outer_damage_type
+						elseif angle <= inner_push_angle then
+							damage_profile = push_settings.inner_damage_profile
+							damage_type = push_settings.inner_damage_type
+						elseif angle <= outer_push_angle then
+							damage_profile = push_settings.outer_damage_profile
+							damage_type = push_settings.outer_damage_type
+						end
+
+						if damage_profile then
+							local _, _, _, stagger_result = Attack.execute(target_unit, damage_profile, "attacking_unit", attacking_unit, "attack_direction", attack_direction, "attack_type", AttackSettings.attack_types.push, "hit_world_position", target_position, "power_level", power_level, "hit_zone_name", "torso", "damage_type", damage_type, "item", optional_weapon_item, "target_number", number_of_units_hit + 1)
+							number_of_units_hit = number_of_units_hit + 1
+
+							if buff_extension then
+								local param_table = buff_extension:request_proc_event_param_table()
+
+								if param_table then
+									param_table.pushing_unit = attacking_unit
+									param_table.pushed_unit = target_unit
+									param_table.stagger_result = stagger_result
+
+									buff_extension:add_proc_event(BuffSettings.proc_events.on_push_hit, param_table)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		return number_of_units_hit
+	end)
+end)
+
 -- POXBURSTER LUNGE: Let any nearby player trigger the extended push
 local POXBURSTER_PUSH_RANGE = 5
 
@@ -1049,7 +1605,6 @@ end)
 
 -- PUSH FRIENDLY MINIONS: Exclude Poxburster
 local FRIENDLY_BROADPHASE_RESULTS = {}
-local MINION_BREED_TYPE = BreedSettings.types.minion
 
 mod:hook_origin(MinionAttack, "push_friendly_minions", function(unit, scratchpad, action_data, t, optional_from_position)
 	table.clear(FRIENDLY_BROADPHASE_RESULTS)
@@ -1168,12 +1723,8 @@ BreedActions.chaos_ogryn_houndmaster.summon.breed_data = {
 BreedActions.renegade_grenadier.throw_grenade.cooldown = MinionDifficultySettings.cooldowns.cultist_grenadier_throw
 BreedActions.renegade_grenadier.quick_throw_grenade.cooldown = MinionDifficultySettings.cooldowns.cultist_grenadier_throw
 
--- NET: SPEED CHANGES & DETECTION RANGE ADJUSTMENTS
+-- NET: DETECTION RANGE ADJUSTMENTS
 local breed_renegade_netgunner = require("scripts/settings/breed/breeds/renegade/renegade_netgunner_breed")
-
-breed_renegade_netgunner.run_speed = 6.5
-breed_renegade_netgunner.walk_speed = 3.5
-BreedActions.renegade_netgunner.approach_target.speed = 6.5
 
 mod:hook_require("scripts/extension_systems/perception/minion_perception_extension", function(MinionPerceptionExtension)
 	mod:hook(MinionPerceptionExtension, "_within_detection_los_range", function(func, self, unit, unit_position, target_unit, target_position)
@@ -1202,29 +1753,6 @@ mod:hook_require("scripts/extension_systems/perception/minion_perception_extensi
 		self._ignore_detection_los_modifiers = ignore_detection_los_modifiers
 
 		return within_range, clear_last_los_position
-	end)
-end)
-
--- NET: Enable collision after being dragged for 0.7 seconds to avoid cross-country drag bullshit
-local NETTED_MINION_COLLISION_DELAY = 0.7
-
-mod:hook_require("scripts/extension_systems/character_state_machine/character_states/player_character_state_netted", function(PlayerCharacterStateNetted)
-	mod:hook_safe(PlayerCharacterStateNetted, "on_enter", function(self)
-		self._locomotion_steering_component.disable_minion_collision = false
-		self._onslaught_minion_collision_enable_t = self._character_state_component.entered_t + NETTED_MINION_COLLISION_DELAY
-	end)
-
-	mod:hook_safe(PlayerCharacterStateNetted, "fixed_update", function(self, unit, dt, t)
-		local enable_t = self._onslaught_minion_collision_enable_t
-
-		if enable_t and t >= enable_t then
-			self._locomotion_steering_component.disable_minion_collision = false
-			self._onslaught_minion_collision_enable_t = nil
-		end
-	end)
-
-	mod:hook_safe(PlayerCharacterStateNetted, "on_exit", function(self)
-		self._onslaught_minion_collision_enable_t = nil
 	end)
 end)
 
@@ -1517,3 +2045,81 @@ end
 
 breed_renegade_executor.target_selection_template = TargetSelectionTemplates.melee
 breed_chaos_ogryn_bulwark.target_selection_template = TargetSelectionTemplates.custom_backline_melee_elite
+
+-- BULWARK: block AOE attacks with the physical shield
+local BULWARK_AOE_ATTACK_TYPES = {
+	[AttackSettings.attack_types.explosion] = true,
+	[AttackSettings.attack_types.shout] = true,
+}
+local bulwark_current_attack_type
+local bulwark_flamer_damage_active = false
+local FlamerAction = require("scripts/utilities/action/flamer_action")
+
+mod:hook(FlamerAction, "damage_target", function(func, ...)
+	bulwark_flamer_damage_active = true
+
+	local target_died = func(...)
+
+	bulwark_flamer_damage_active = false
+
+	return target_died
+end)
+
+mod:hook_require("scripts/utilities/attack/damage_taken_calculation", function(DamageTakenCalculation)
+	mod:hook(DamageTakenCalculation, "calculation_parameters", function(func, attacked_unit, attacked_breed_or_nil, damage_profile, attacking_unit, attacking_unit_owner_unit, hit_actor, attacker_buff_extension, attack_type)
+		bulwark_current_attack_type = attack_type
+
+		local is_invulnerable, damage_allowed, health_setting, current_health_damage, current_permanent_damage, max_health, max_wounds, toughness_template, weapon_toughness_template, current_toughness_damage, movement_state, shield_setting, attacked_unit_stat_buffs, attacked_unit_keywords, attacking_unit_stat_buffs, shield_template = func(attacked_unit, attacked_breed_or_nil, damage_profile, attacking_unit, attacking_unit_owner_unit, hit_actor, attacker_buff_extension, attack_type)
+
+		bulwark_current_attack_type = nil
+
+		return is_invulnerable, damage_allowed, health_setting, current_health_damage, current_permanent_damage, max_health, max_wounds, toughness_template, weapon_toughness_template, current_toughness_damage, movement_state, shield_setting, attacked_unit_stat_buffs, attacked_unit_keywords, attacking_unit_stat_buffs, shield_template
+	end)
+end)
+
+mod:hook_require("scripts/extension_systems/shield/minion_shield_extension", function(MinionShieldExtension)
+	mod:hook(MinionShieldExtension, "can_block_attack", function(func, self, damage_profile, attacking_unit, attacking_unit_owner_unit, hit_actor)
+		local result = func(self, damage_profile, attacking_unit, attacking_unit_owner_unit, hit_actor)
+
+		if result ~= nil then
+			return result
+		end
+
+		if not bulwark_flamer_damage_active and not BULWARK_AOE_ATTACK_TYPES[bulwark_current_attack_type] then
+			return result
+		end
+
+		local unit_data_extension = ScriptUnit.has_extension(self._unit, "unit_data_system")
+		local breed = unit_data_extension and unit_data_extension:breed()
+
+		if breed and breed.name ~= "chaos_ogryn_bulwark" then
+			return result
+		end
+
+		if not self._shield_component or not self._shield_component.is_blocking then
+			return result
+		end
+
+		if not attacking_unit then
+			return result
+		end
+
+		local attack_position = POSITION_LOOKUP[attacking_unit] or attacking_unit_owner_unit and POSITION_LOOKUP[attacking_unit_owner_unit]
+		local unit_position = POSITION_LOOKUP[self._unit]
+
+		if not attack_position or not unit_position then
+			return result
+		end
+
+		local unit_forward = Quaternion.forward(Unit.local_rotation(self._unit, 1))
+		local attack_direction = Vector3.normalize(attack_position - unit_position)
+		local blocking_angle = self._template and self._template.blocking_angle or math.degrees_to_radians(70)
+		local dot = Vector3.dot(attack_direction, unit_forward)
+
+		if dot >= math.cos(blocking_angle) then
+			return "block_all"
+		end
+
+		return result
+	end)
+end)

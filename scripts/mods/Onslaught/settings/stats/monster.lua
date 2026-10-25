@@ -1,6 +1,7 @@
 local mod = get_mod("Onslaught")
 
 local MinionDifficultySettings = require("scripts/settings/difficulty/minion_difficulty_settings")
+local PerceptionSettings = require("scripts/settings/perception/perception_settings")
 local breed_chaos_ogryn_houndmaster = require("scripts/settings/breed/breeds/chaos/chaos_ogryn_houndmaster_breed")
 
 -- HEALTH INCREASE MONSTERS & CAPTAINS
@@ -41,7 +42,7 @@ MinionDifficultySettings.health.chaos_spawn = _monster_health_steps(15750)
 MinionDifficultySettings.health.chaos_daemonhost = _monster_health_steps(16000)
 MinionDifficultySettings.health.chaos_mutator_daemonhost = _monster_health_steps(16000)
 MinionDifficultySettings.health.cultist_captain = _captain_health_steps(50000)
-MinionDifficultySettings.health.renegade_captain = _captain_health_steps(50000)
+MinionDifficultySettings.health.renegade_captain = _ogryn_health_steps(27000)
 MinionDifficultySettings.health.renegade_twin_captain = _captain_health_steps(72000)
 MinionDifficultySettings.health.renegade_twin_captain_two = _captain_health_steps(72000)
 
@@ -131,11 +132,6 @@ end)
 
 local NEW_MUTATOR = "special_elites"
 
-local special_elites = {
-    "chaos_ogryn_houndmaster",
---    "renegade_radio_operator",
-}
-
 mod:hook_require("scripts/settings/mutator/mutator_templates", function(instance)
     -- really shitty way of making the game spawn more monsters, but because each map has a hard cap on how many monster spawn points there are, usually this maxes out at 6 monsters per run
     local more_monsters = instance.mutator_more_monsters
@@ -179,6 +175,20 @@ mod:hook_require("scripts/settings/mutator/mutator_templates", function(instance
         mod:error("Could not find havoc_mutator_monster_specials_02 in mutator_templates!")
     end
 
+	local havoc_mutator_more_captains_02 = instance.havoc_mutator_more_captains_02
+	if havoc_mutator_more_captains_02 and havoc_mutator_more_captains_02.modify_pacing then
+		havoc_mutator_more_captains_02.modify_pacing = {
+			monster_spawn_type = "captains",
+			monsters_per_travel_distance = {
+				120,
+				240,
+			},
+			monster_breed_name = {
+				"cultist_captain",
+			},
+		}
+	end
+
 	local original = instance.havoc_mutator_monster_specials_02
 
 	if not original or not original.init_modify_pacing then
@@ -192,7 +202,7 @@ mod:hook_require("scripts/settings/mutator/mutator_templates", function(instance
 	custom.modify_pacing = nil
 	custom.spawn_settings = {
 		chance = 1,
-		cooldown = { 90, 150 },
+		cooldown = { 90, 130 },
 		health_modifier = 1,
 	}
 
@@ -209,6 +219,10 @@ mod:hook_origin(SpecialsPacing, "_add_spawner_special", function(self, spawner, 
     param_table.target_side_id = target_side_id
     param_table.max_health_modifier = optional_health_modifier
     param_table.onslaught_specials_health_modifier = optional_health_modifier
+
+    if breed_name == "renegade_captain" then
+        param_table.optional_aggro_state = PerceptionSettings.aggro_states.aggroed
+    end
 
     local spawner_queue_id = spawner:add_spawns({
         breed_name,

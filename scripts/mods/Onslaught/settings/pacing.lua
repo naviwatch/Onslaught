@@ -119,3 +119,43 @@ mod:hook_safe(TerrorEventManager, "start_terror_trickle", function(self)
 		template.challenge_rating_stop_threshold = math.huge
 	end
 end)
+
+-- PICKUPS: Slightly favor small and large ammo bags over med/ammo crates
+mod:hook_require("scripts/settings/pickup/pickup_pools", function(PickupPools)
+	local function adjust_distribution_pool(pool)
+		for _, distribution in pairs(pool) do
+			if type(distribution) == "table" then
+				for _, pickup_category in pairs(distribution) do
+					if type(pickup_category) == "table" then
+						for pickup_name, amounts in pairs(pickup_category) do
+							if type(amounts) == "table" then
+								for i, amount in ipairs(amounts) do
+									if amount > 0 then
+										if pickup_name == "small_clip" or pickup_name == "large_clip" then
+											amounts[i] = math.ceil(amount * 1.35)
+                                        elseif pickup_name == "small_metal" or pickup_name == "large_metal" or pickup_name == "small_platinum" or pickup_name == "large_platinum" then
+                                            amounts[i] = math.ceil(amount * 0)
+                                        end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	for pool_name, pool in pairs(PickupPools) do
+		if type(pool) == "table" and string.find(pool_name, "_distribution_pool", 1, true) then
+			adjust_distribution_pool(pool)
+		end
+	end
+end)
+
+--[[
+mod:hook_require("scripts/settings/pickup/pickup_settings", function(PickupSettings)
+	PickupSettings.pickup_pool_value.medical_crate_pocketable = PickupSettings.pickup_pool_value.medical_crate_pocketable * 1.25
+	PickupSettings.pickup_pool_value.ammo_cache_pocketable = PickupSettings.pickup_pool_value.ammo_cache_pocketable * 1.25
+end)
+]]

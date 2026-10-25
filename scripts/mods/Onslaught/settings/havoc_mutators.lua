@@ -23,7 +23,7 @@ mod:hook_require("scripts/settings/circumstance/templates/havoc_circumstance_tem
 			"mutator_enable_auric",
 			"mutator_auric_tension_modifier",
 			"mutator_add_resistance",
-			"havoc_mutator_more_captains_01",
+			"havoc_mutator_more_captains_02",
 		--	"havoc_higher_stagger_thresholds",
 			"mutator_havoc_override_horde_pacing_02",
 			"mutator_monster_havoc_twins",
@@ -171,6 +171,10 @@ local VALID_ATTACK_TYPES = {
 	[attack_types.explosion] = true,
 }
 
+local EXPLOSION = {
+	[attack_types.explosion] = true,
+}
+
 local function _pick_target(attacking_unit, position)
 	if HEALTH_ALIVE[attacking_unit] and Managers.state.player_unit_spawn:owner(attacking_unit) then
 		return attacking_unit
@@ -231,8 +235,7 @@ local function _clear_spawn_position(physics_world, corpse_position, target_unit
 	return origin + flat * push
 end
 
-local function _spawn_volatile_ball(position, target_unit)
-	local projectile_template = ProjectileTemplates.renegade_wizard_force_ball_nurgle
+local function _spawn_volatile_ball(projectile_template, position, target_unit)
 	local item = MasterItems.get_cached()[projectile_template.item_name]
 	local target_position = POSITION_LOOKUP[target_unit] or Unit.world_position(target_unit, 1)
 	local direction = Vector3.normalize(target_position + Vector3.up() - position)
@@ -241,32 +244,73 @@ local function _spawn_volatile_ball(position, target_unit)
 	Managers.state.unit_spawner:spawn_network_unit(nil, "item_projectile", position, rotation, nil, item, projectile_template, TRUE_FLIGHT, direction, VOLATILE_BALL_SPEED, Vector3.zero(), nil, false, nil, nil, target_unit, nil, nil, nil, "villains")
 end
 
--- Register buff to NetworkLookup
-register_buff(VOLATILE_BUFF_NAME, {
-	class_name = "proc_buff",
-	predicted = false,
-	max_stacks = 1,
-	target = BuffSettings.targets.minion_only,
-	minion_effects = table.clone(BuffTemplates.mutator_minion_nurgle_blessing_tougher.minion_effects),
-	proc_events = {
-		[proc_events.on_death] = 1,
-	},
-	check_proc_func = function(params, template_data, template_context)
-		return template_context.is_server
-			and not template_data.done
-			and VALID_ATTACK_TYPES[params.attack_type] == true
-	end,
-	proc_func = function(params, template_data, template_context)
-		template_data.done = true
+local function _volatile_minion_effects(color_or_nil)
+	local effects = table.clone(BuffTemplates.mutator_minion_nurgle_blessing_tougher.minion_effects)
 
-		local unit = template_context.unit
-		local corpse_position = params.position and params.position:unbox() or Unit.world_position(unit, 1)
-		local target_unit = _pick_target(params.attacking_unit, corpse_position)
+	if color_or_nil then
+		effects.node_effects = nil
+		effects.material_vector.value = table.clone(color_or_nil)
+	end
 
-		if target_unit then
-			local spawn_position = _clear_spawn_position(template_context.physics_world, corpse_position, target_unit)
+	return effects
+end
 
-			_spawn_volatile_ball(spawn_position, target_unit)
-		end
-	end,
-})
+local function _volatile_buff_template(projectile_template, valid_attack_types, color_or_nil)
+	return {
+		class_name = "proc_buff",
+		predicted = false,
+		max_stacks = 1,
+		target = BuffSettings.targets.minion_only,
+		minion_effects = _volatile_minion_effects(color_or_nil),
+		proc_events = {
+			[proc_events.on_death] = 1,
+		},
+		check_proc_func = function(params, template_data, template_context)
+			return template_context.is_server
+				and not template_data.done
+				and valid_attack_types[params.attack_type] == true
+		end,
+		proc_func = function(params, template_data, template_context)
+			template_data.done = true
+
+			local unit = template_context.unit
+			local corpse_position = params.position and params.position:unbox() or Unit.world_position(unit, 1)
+			local target_unit = _pick_target(params.attacking_unit, corpse_position)
+
+			if target_unit then
+				local spawn_position = _clear_spawn_position(template_context.physics_world, corpse_position, target_unit)
+
+				_spawn_volatile_ball(projectile_template, spawn_position, target_unit)
+			end
+		end,
+	}
+end
+
+-- VOLATILE BALL ON RANGED DEATH (green ball)
+register_buff(VOLATILE_BUFF_NAME, _volatile_buff_template(
+	ProjectileTemplates.renegade_wizard_force_ball_nurgle,
+	VALID_ATTACK_TYPES
+))
+
+local PURPLE = { 0.54, 0.16, 0.88 }
+
+register_buff("volatile_on_explosion_death", _volatile_buff_template(
+	ProjectileTemplates.renegade_wizard_force_ball_nurgle,
+	EXPLOSION,
+	PURPLE
+))
+
+-- VOLATILE BALL ON DOT DEATH (red ball)
+local VOLATILE_DOT_BUFF_NAME = "volatile_on_dot_death"
+
+local DOT_ATTACK_TYPES = {
+	[attack_types.buff] = true,
+}
+
+local RED_COLOR = { 0.9, 0.1, 0.4 }
+
+register_buff(VOLATILE_DOT_BUFF_NAME, _volatile_buff_template(
+	ProjectileTemplates.renegade_wizard_force_ball_warp,
+	DOT_ATTACK_TYPES,
+	RED_COLOR
+))

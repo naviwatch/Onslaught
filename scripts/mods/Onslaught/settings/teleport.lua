@@ -110,10 +110,10 @@ local tpLocations = {
 		{ -249.75, 112.96, -3.02, 72.7 }
 	},
 	-- Silo Cluster
-	-- ["dm_stockpile"] = {
-		-- { XX, XX, XX, XX },
-		-- { XX, XX, XX, XX }
-	-- },
+	["dm_stockpile"] = {
+		{ 145.99, 37.68, 32.85, 89.7 },
+		{ -205.34, 231.82, 6.34, 67.4 }
+	},
 	-- Smelter Complex
 	-- ["dm_forge"] = {
 		-- { XX, XX, XX, XX },

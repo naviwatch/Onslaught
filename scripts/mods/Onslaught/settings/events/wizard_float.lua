@@ -7,7 +7,7 @@ local mod = get_mod("Onslaught")
 		{
 			"onslaught_spawn_wizard_float",
 			tag = "wizard",                     -- used to despawn him later; one living wizard per tag
-			spawn_once = true,                  -- optional: never respawn the wizard in the same terror event
+			spawn_once = true,                  -- optional: never respawn wizard until the mission is reloaded
 			position = { x, y, z },             -- optional: default = near a random player
 			despawn_with_event = true,          -- default true: gone when THIS event ends/stops
 			duration = 90,                      -- optional: forced despawn after n seconds
@@ -31,6 +31,7 @@ local mod = get_mod("Onslaught")
 ]]
 
 local Blackboard = require("scripts/extension_systems/blackboard/utilities/blackboard")
+local Breeds = require("scripts/settings/breed/breeds")
 local NavQueries = require("scripts/utilities/nav_queries")
 local TerrorEventManager = require("scripts/managers/terror_event/terror_event_manager")
 
@@ -54,9 +55,30 @@ local DEFAULTS = {
 	enraged = true,
 }
 
+Breeds[BREED_NAME].wizard_float_resources = {
+	nurgle_projectile_effect_template_name = "renegade_wizard_nurgle_projectile",
+	warp_projectile_effect_template_name = "renegade_wizard_warp_projectile",
+}
+
 local wizard = {}
 local wizard_by_tag = {}
 local spawned_tags = {}
+
+local state_owner = nil
+
+local function clear_state()
+	table.clear(wizard)
+	table.clear(wizard_by_tag)
+	table.clear(spawned_tags)
+end
+
+local function sync_state(manager)
+	if manager ~= state_owner then
+		state_owner = manager
+
+		clear_state()
+	end
+end
 
 local function setting(node, key)
 	local value = node[key]
@@ -175,6 +197,8 @@ local function tag_has_living_wizard(tag)
 end
 
 local function spawn_wizard(node, event)
+	sync_state(Managers.state.terror_event)
+
 	local tag = node.tag or "default"
 
 	if tag_has_living_wizard(tag) or (node.spawn_once and spawned_tags[tag]) then
@@ -378,6 +402,8 @@ local function update_wizard(manager, unit, data, t)
 end
 
 mod:hook_safe(TerrorEventManager, "update", function(self, dt, t)
+	sync_state(self)
+
 	if not self._is_server or next(wizard) == nil then
 		return
 	end
@@ -416,7 +442,7 @@ end
 
 -- Cleanup (called from functions.lua)
 mod.clear_wizard_float_state = function()
-	table.clear(wizard)
-	table.clear(wizard_by_tag)
-	table.clear(spawned_tags)
+	clear_state()
+
+	state_owner = nil
 end

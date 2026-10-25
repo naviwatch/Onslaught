@@ -378,7 +378,7 @@ mod:hook_require("scripts/managers/pacing/horde_pacing/horde_pacing_templates", 
 					strike_data.conditions = {}
 
 					if strike_type == "long_horde" then
-						strike_data.total_num_allowed = { 1, 2 }
+						strike_data.total_num_allowed = { 0, 0 }
 					end
 
 					if strike_type == "ranged_push_from_behind" then

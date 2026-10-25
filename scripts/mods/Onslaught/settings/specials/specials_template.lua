@@ -3,6 +3,8 @@ local mod = get_mod("Onslaught")
 local SpecialPacingTemplateSettings = require("scripts/managers/pacing/specials_pacing/templates/special_pacing_template_settings")
 local HavocSettings = SpecialPacingTemplateSettings.havoc
 local SpecialsPacing = require("scripts/managers/pacing/specials_pacing/specials_pacing")
+local PerceptionSettings = require("scripts/settings/perception/perception_settings")
+local PseudoRandomDistribution = mod:io_dofile("Onslaught/scripts/mods/Onslaught/settings/specials/prd")
 
 local onslaught_settings = {
     -- interrupter_patrols = INTERRUPTER_PATROLS
@@ -24,6 +26,7 @@ local onslaught_settings = {
 		renegade_grenadier = "ahead",
 		renegade_sniper = "ahead",
 		chaos_ogryn_houndmaster = "ahead",
+		renegade_captain = "ahead",
 		renegade_radio_operator = "ahead",
 	},
 	default_optional_mainpath_offset = {
@@ -115,6 +118,7 @@ local onslaught_settings = {
 			renegade_sniper = 25,
 			chaos_armored_hound = 25,
 			chaos_ogryn_houndmaster = 30,
+			renegade_captain = 20,
 			renegade_radio_operator = 25,
 		},
 		default_min_spawners_ranges = {
@@ -204,12 +208,12 @@ local onslaught_settings = {
 			chaos_plague_ogryn = 2,
 			chaos_poxwalker_bomber = 5,
 			chaos_spawn = 2,
-			cultist_flamer = 4,
+			cultist_flamer = 3,
 			cultist_grenadier = 1,
 			cultist_mutant = 3,
-			flamer = 4,
+			flamer = 3,
 		--	grenadier = 3,
-			renegade_flamer = 4,
+			renegade_flamer = 3,
 			renegade_grenadier = 1,
 			renegade_netgunner = 3,
 			renegade_sniper = 3,
@@ -229,7 +233,7 @@ mod:hook_require("scripts/managers/pacing/specials_pacing/specials_pacing_templa
         return
     end
 	
-	local mas = 6
+	local mas = 4
 	if mod:get("giga_specials") then
 		mas = 10
 	end
@@ -285,8 +289,12 @@ end)
 local NEW_MUTATOR = "special_elites"
 local MONSTER_OVERRIDE_DELAY = 180
 local special_elites = {
-    "chaos_ogryn_houndmaster",
---    "renegade_radio_operator",
+	{ breed_name = "chaos_ogryn_houndmaster", weight = 1 },
+	{ breed_name = "renegade_captain", weight = 1 },
+}
+local twin_captain_breeds = {
+	renegade_twin_captain = true,
+	renegade_twin_captain_two = true,
 }
 
 mod:hook(SpecialsPacing, "_check_monster_override", function(func, self, template, ...)
@@ -312,8 +320,8 @@ local function _special_elite_slot_is_active(specials_slots)
 		local breed_name = slot.breed_name
 
 		-- Check if any of ours annoying fucks are currently active in a slot
-		for _, target_breed in ipairs(special_elites) do
-			if breed_name == target_breed then
+		for _, elite in ipairs(special_elites) do
+			if breed_name == elite.breed_name then
 				if slot.spawner_queue_id then
 					return true
 				end
@@ -329,27 +337,90 @@ local function _special_elite_slot_is_active(specials_slots)
 	return false
 end
 
+local function _twin_captain_is_alive()
+	local pacing_manager = Managers.state.pacing
+	local monster_pacing = pacing_manager and pacing_manager._monster_pacing
+	local alive_monsters = monster_pacing and monster_pacing._alive_monsters
+
+	if not alive_monsters then
+		return false
+	end
+
+	for i = 1, #alive_monsters do
+		local monster = alive_monsters[i]
+		local unit = monster.spawned_unit
+
+		if twin_captain_breeds[monster.breed_name] and unit and ALIVE[unit] then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _choose_special_elite(self)
+	local prd_states = self._onslaught_special_elite_prd_states
+	if not prd_states then
+		prd_states = {}
+		self._onslaught_special_elite_prd_states = prd_states
+	end
+
+	local exclude_captains = _twin_captain_is_alive()
+	local eligible_elites = {}
+	local seed = self._onslaught_special_elite_prd_seed or math.random_seed()
+	local remaining_weight = 0
+
+	for _, elite in ipairs(special_elites) do
+		if not exclude_captains or (elite.breed_name ~= "renegade_captain") then
+			eligible_elites[#eligible_elites + 1] = elite
+			remaining_weight = remaining_weight + elite.weight
+		end
+	end
+
+	for i = 1, #eligible_elites - 1 do
+		local elite = eligible_elites[i]
+		local chance = math.round_with_precision(elite.weight / remaining_weight, 2)
+		local selected, prd_state, next_seed = PseudoRandomDistribution.flip_coin(chance, prd_states[elite.breed_name], seed)
+
+		prd_states[elite.breed_name] = prd_state
+		seed = next_seed
+
+		if selected then
+			self._onslaught_special_elite_prd_seed = seed
+
+			return elite.breed_name
+		end
+
+		remaining_weight = remaining_weight - elite.weight
+	end
+
+	self._onslaught_special_elite_prd_seed = seed
+
+	return eligible_elites[#eligible_elites].breed_name
+end
+
 mod:hook(SpecialsPacing, "_spawn_special", function(func, self, specials_slot, side_id, target_side_id)
 	local manager = Managers.state.mutator
 	local mutator = manager and manager:mutator(NEW_MUTATOR)
 	local settings = mutator and mutator._template.spawn_settings
 	local t = Managers.time:time("gameplay")
-	local can_override = settings
-		and not specials_slot.injected
+	local can_override = settings and not specials_slot.injected
 		and not specials_slot.coordinated_strike
 		and not specials_slot.monster_breed_override
 		and t >= (self._houndmaster_cooldown_t or 0)
 		and not _special_elite_slot_is_active(self._specials_slots)
 
 	if can_override and math.random() < settings.chance then
-		local chosen_breed = special_elites[math.random(1, #special_elites)]
+		local chosen_breed = _choose_special_elite(self)
 		local original_breed_name = specials_slot.breed_name
 		local original_health_modifier = specials_slot.optional_health_modifier
 		local original_monster_breed_override = specials_slot.monster_breed_override
+		local aggro_states = PerceptionSettings.aggro_states
 
 		specials_slot.breed_name = chosen_breed
 		specials_slot.optional_health_modifier = settings.health_modifier
 		specials_slot.monster_breed_override = true
+		specials_slot.optional_aggro_state = aggro_states.aggroed
 
 		local success, spawned_unit, spawner_queue_id, spawner = func(self, specials_slot, side_id, target_side_id)
 
